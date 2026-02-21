@@ -1,0 +1,16 @@
+PyYAML==6.0.1
+requests==2.31.0
+streamlit==1.41.1
+pandas==2.2.0
+beautifulsoup4==4.12.3
+psutil==5.9.8
+openai==1.12.0
+tenacity==8.2.3
+fake-useragent==1.4.0
+plotly==5.18.0
+duckduckgo-search>=6.3.0,<7
+python-dotenv==1.1.1
+httpx<0.28
+playwright==1.54.0
+fastapi==0.115.8
+uvicorn[standard]==0.30.6

@@ -1,0 +1,12 @@
+.env
+.venv/
+.vscode/
+__pycache__/
+*.pyc
+*.db
+data/*
+data/**/*.sqlite
+data/**/*.sqlite-journal
+data/**/*.log
+data/**/*.json
+data/**/*.lock

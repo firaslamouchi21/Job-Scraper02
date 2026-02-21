@@ -1,0 +1,46 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: comment-free-check
+        shell: bash
+        run: |
+          test -z "$(grep -R -n -E '^\s*#' --include='*.py' . || true)"
+          test -z "$(grep -R -n -E '"""|\x27\x27\x27' --include='*.py' . || true)"
+      - name: python-compile
+        run: |
+          python -m compileall -q .
+      - name: cli-smoke
+        run: |
+          python cli.py export --format json --limit 1
+      - name: docker-build
+        run: |
+          docker compose build
+      - name: scraper-health
+        shell: bash
+        run: |
+          docker compose up -d scraper
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs scraper || true
+          exit 1
+      - name: docker-down
+        if: always()
+        run: |
+          docker compose down -v

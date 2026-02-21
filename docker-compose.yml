@@ -1,0 +1,44 @@
+services:
+  agent-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+      - SCRAPER_URL=http://scraper:8000
+    volumes:
+      - ./data:/data
+      - ./config:/config
+    depends_on:
+      - scraper
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    ports:
+      - "8000:8000"
+    environment:
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+    volumes:
+      - ./data:/data
+      - ./config:/config
+
+  automation-engine:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - DB_TYPE=sqlite
+      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - ./data/n8n:/home/node/.n8n
