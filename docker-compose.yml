@@ -30,6 +30,16 @@ services:
       - ./data:/data
       - ./config:/config
 
+  automation-engine-init:
+    image: alpine:3.19
+    command: >
+      sh -c "
+        mkdir -p /home/node/.n8n &&
+        chown -R 1000:1000 /home/node/.n8n
+      "
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+
   automation-engine:
     image: n8nio/n8n:latest
     ports:
@@ -44,3 +54,5 @@ services:
       - N8N_DIAGNOSTICS_ENABLED=false
     volumes:
       - ./data/n8n:/home/node/.n8n
+    depends_on:
+      - automation-engine-init
