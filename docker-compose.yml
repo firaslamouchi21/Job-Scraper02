@@ -1,8 +1,9 @@
 services:
   agent-ui:
+    image: ghcr.io/firaslamouchi21/job-scraper02/ui:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.ui
     ports:
       - "8501:8501"
     environment:
@@ -16,6 +17,7 @@ services:
       - scraper
 
   scraper:
+    image: ghcr.io/firaslamouchi21/job-scraper02/scraper:latest
     build:
       context: .
       dockerfile: Dockerfile.scraper
