@@ -13,7 +13,8 @@ A local-first job scraping stack with Docker Compose by Firas Lamouchi.
 - scraper: FastAPI service at <http://localhost:8000>
 - automation-engine: n8n at <http://localhost:5678>
 
-## Quick Start
+## Quick Start<img width="1910" height="861" alt="Screenshot 2026-02-03 193941" src="https://github.com/user-attachments/assets/aff71770-2775-4731-9f90-d19efdf7a24c" />
+
 
 1. Configure
 
