@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: job-scraper-ui
+    runtime: docker
+    dockerfilePath: ./Dockerfile.ui
+    plan: standard
+    envVars:
+      - key: SCRAPER_URL
+        fromService:
+          name: job-scraper-api
+          type: web
+          property: hostport
+      - key: DATA_DIR
+        value: /data
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+
+  - type: web
+    name: job-scraper-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.scraper
+    plan: standard
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: REQUEST_DELAY_SECONDS
+        value: "2.0"
+      - key: RETRY_MAX_ATTEMPTS
+        value: "5"
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

@@ -1,116 +1,125 @@
-# Job Scraper Tool by Firas Lamouchi
+# Job Scraper by Firas
 
-![CI](https://github.com/REPLACE_OWNER/REPLACE_REPO/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/firaslamouchi21/Job-Scraper02/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Python](https://img.shields.io/badge/python-3.11-blue)
-![Docker](https://img.shields.io/badge/docker-compose-blue)
 
-A local-first job scraping stack with Docker Compose by Firas Lamouchi.
+A no-nonsense job search tool that finds listings across multiple sites and scores them against your CV using AI. Built it because I was tired of checking ten different job boards every morning.
 
-## Services
+Runs entirely in Docker on a Linux VM. No local Python setup, no dependency hell, no "works on my machine".
 
-- agent-ui: Streamlit UI at <http://localhost:8501>
-- scraper: FastAPI service at <http://localhost:8000>
-- automation-engine: n8n at <http://localhost:5678>
+## What you get
 
-## Quick Start<img width="1910" height="861" alt="Screenshot 2026-02-03 193941" src="https://github.com/user-attachments/assets/aff71770-2775-4731-9f90-d19efdf7a24c" />
+- Paste your CV and keywords into the web UI
+- AI scores every job 0-100 for relevance
+- Pause, resume, or restart runs from the dashboard
+- Export results as JSON or CSV
+- All data lives in a SQLite database you actually own
 
+## How to run it
 
-1. Configure
+You need Docker. That's it.
 
-Edit files in ./config:
+### 1. Set your environment
 
-- sites.txt: one site per line
-- keywords.txt: one keyword or job title per line
-- cv.txt: your CV text
-- .env.example: copy to .env and set GROQ_API_KEY (optional)
+```bash
+cp .env.example .env
+```
 
-1. Run
+Edit `.env` and drop in any AI keys you have (Groq, Anthropic, or Gemini). If you don't have any, lite mode works fine with keyword matching.
+
+### 2. Spin it up
 
 ```bash
 docker compose up --build
 ```
 
-1. Use
+This builds two containers:
 
-- Open UI: <http://localhost:8501>
-- Open n8n: <http://localhost:5678>
+- **scraper** at `http://localhost:8000` (the brain)
+- **UI** at `http://localhost:8501` (your dashboard)
 
-## Developer CLI
-
-Run without the UI:
+The optional n8n automation engine lives under a separate profile if you want it later:
 
 ```bash
-python cli.py run --lite
-python cli.py run --api-key YOUR_GROQ_KEY
+docker compose --profile automation up
 ```
 
-Export saved results from the local SQLite database:
+### 3. Open the UI
+
+Go to `http://localhost:8501`, paste your CV, add some keywords like "senior python remote", pick your AI provider (or stay in lite mode), and hit Start. Watch the progress bar fill up. High-scoring jobs bubble to the top.
+
+### 4. Export when done
 
 ```bash
-python cli.py export --format json --limit 200
-python cli.py export --format csv --out jobs.csv
+curl http://localhost:8000/export/csv > jobs.csv
 ```
 
-You can override paths:
+## Docker is the only way
+
+This app is designed to run inside Docker containers on a Linux VM. Do not try to run it natively on Windows or macOS. The scraper uses Playwright, the UI needs Streamlit, and the database expects a Unix path structure. Docker handles all of that for you.
+
+Requirements:
+
+- Docker Engine 24+ or Docker Desktop
+- A Linux VM (WSL2 on Windows, OrbStack or Docker Desktop on Mac, any Linux host)
+- 2GB RAM minimum, 4GB recommended
+
+## Environment variables
+
+| Variable | What it does | Default |
+| --- | --- | --- |
+| `GROQ_API_KEY` | Groq AI scoring | empty |
+| `ANTHROPIC_API_KEY` | Claude AI scoring | empty |
+| `GEMINI_API_KEY` | Google AI scoring | empty |
+| `DATA_DIR` | Where SQLite and logs live | `./data` |
+| `REQUEST_DELAY_SECONDS` | Politeness between searches | `2.0` |
+| `RETRY_MAX_ATTEMPTS` | How many times to retry a failed search | `5` |
+
+## API for power users
+
+The scraper exposes a FastAPI server. The UI talks to it, but you can too.
+
+Start a run:
 
 ```bash
-python cli.py --config ./config --data ./data run --lite
+curl -X POST http://localhost:8000/run \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"groq","lite_mode":true,"sites":["example.com"],"keywords":["python"],"cv_text":"developer"}'
 ```
 
-## Makefile
+Check status:
+
+```bash
+curl http://localhost:8000/status
+```
+
+Pause a running job:
+
+```bash
+curl -X POST http://localhost:8000/pause
+```
+
+Resume:
+
+```bash
+curl -X POST http://localhost:8000/resume
+```
+
+Kill it:
+
+```bash
+curl -X POST http://localhost:8000/stop
+```
+
+## Makefile shortcuts
 
 ```bash
 make build
 make up
 make down
 make logs
-make ps
 ```
 
-## BYOK and Lite Mode
+## Keeping your keys safe
 
-- Provide a Groq API key in the UI to enable AI scoring.
-- Toggle Lite Mode to use keyword-only scoring without an API key.
-- Scraper can also be triggered from n8n via POST <http://scraper:8000/run>
-
-## Persistence
-
-All state is stored in ./data:
-
-- SQLite database and logs
-- n8n workflows and database
-
-Running docker compose down will not delete ./data.
-
-## Scraper API
-
-Trigger a run:
-
-- POST <http://localhost:8000/run>
-
-Read results:
-
-- GET <http://localhost:8000/jobs>
-
-Export:
-
-- GET <http://localhost:8000/export/json>
-- GET <http://localhost:8000/export/csv>
-
-## Rate limiting and retries
-
-The scraper supports basic delay and retry tuning via environment variables:
-
-- REQUEST_DELAY_SECONDS (default 0.6)
-- RETRY_MAX_ATTEMPTS (default 4)
-- RETRY_BASE_SECONDS (default 0.6)
-- RETRY_MAX_SECONDS (default 8)
-
-## n8n Trigger
-
-Send a POST to <http://scraper:8000/run> with JSON:
-
-```json
-{"api_key":"your_key","lite_mode":false}
-```
+Never commit `.env`. It is gitignored by default. If you accidentally pushed a key, rotate it immediately.

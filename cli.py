@@ -3,21 +3,28 @@ import json
 import os
 import sys
 import db
-import scraper
 
 
 def parse_args(argv: list[str]):
-    p = argparse.ArgumentParser(
-        prog="job-scraper",
-        description="Job Scraper Tool by Firas Lamouchi",
-    )
+    p = argparse.ArgumentParser(prog="job-scraper")
     p.add_argument("--config", default=os.environ.get("CONFIG_DIR", "./config"))
     p.add_argument("--data", default=os.environ.get("DATA_DIR", "./data"))
 
     sub = p.add_subparsers(dest="cmd", required=True)
 
     run = sub.add_parser("run")
+    run.add_argument(
+        "--provider",
+        choices=["groq", "anthropic", "gemini"],
+        default="groq",
+    )
     run.add_argument("--api-key", default=os.environ.get("GROQ_API_KEY", ""))
+    run.add_argument("--groq-api-key", default=os.environ.get("GROQ_API_KEY", ""))
+    run.add_argument(
+        "--anthropic-api-key",
+        default=os.environ.get("ANTHROPIC_API_KEY", ""),
+    )
+    run.add_argument("--gemini-api-key", default=os.environ.get("GEMINI_API_KEY", ""))
     run.add_argument("--lite", action="store_true")
 
     export = sub.add_parser("export")
@@ -68,7 +75,19 @@ def main(argv: list[str] | None = None):
     os.environ["DATA_DIR"] = args.data
 
     if args.cmd == "run":
-        scraper.run_scrape(args.api_key or "", bool(args.lite))
+        import scraper
+
+        keys = {
+            "groq": args.groq_api_key or args.api_key or "",
+            "anthropic": args.anthropic_api_key or "",
+            "gemini": args.gemini_api_key or "",
+        }
+        scraper.run_scrape(
+            args.api_key or "",
+            bool(args.lite),
+            provider=args.provider,
+            api_keys=keys,
+        )
         return 0
 
     if args.cmd == "export":

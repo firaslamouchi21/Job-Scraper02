@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "job-scraper02"
+version = "0.1.0"
+description = "Multi-provider AI job scraper with Streamlit UI and REST API"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Firas Lamouchi", email = "firaslamouchi21@gmail.com"}
+]
+keywords = ["job-scraper", "ai", "streamlit", "fastapi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "PyYAML==6.0.1",
+    "requests==2.31.0",
+    "streamlit==1.41.1",
+    "pandas==2.2.0",
+    "beautifulsoup4==4.12.3",
+    "psutil==5.9.8",
+    "openai==1.12.0",
+    "tenacity==8.2.3",
+    "fake-useragent==1.4.0",
+    "plotly==5.18.0",
+    "duckduckgo-search>=6.3.0,<7",
+    "python-dotenv==1.1.1",
+    "httpx<0.28",
+    "playwright==1.54.0",
+    "fastapi==0.115.8",
+    "uvicorn[standard]==0.30.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+job-scraper = "cli:main"
+
+[project.urls]
+Homepage = "https://github.com/firaslamouchi21/Job-Scraper02"
+Repository = "https://github.com/firaslamouchi21/Job-Scraper02"
+Issues = "https://github.com/firaslamouchi21/Job-Scraper02/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*.py"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

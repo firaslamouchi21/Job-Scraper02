@@ -8,11 +8,12 @@ services:
       - "8501:8501"
     environment:
       - DATA_DIR=/data
-      - CONFIG_DIR=/config
       - SCRAPER_URL=http://scraper:8000
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
       - ./data:/data
-      - ./config:/config
     depends_on:
       - scraper
 
@@ -25,13 +26,15 @@ services:
       - "8000:8000"
     environment:
       - DATA_DIR=/data
-      - CONFIG_DIR=/config
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
       - ./data:/data
-      - ./config:/config
 
   automation-engine-init:
     image: alpine:3.19
+    profiles: ["automation"]
     command: >
       sh -c "
         mkdir -p /home/node/.n8n &&
@@ -42,6 +45,7 @@ services:
 
   automation-engine:
     image: n8nio/n8n:latest
+    profiles: ["automation"]
     ports:
       - "5678:5678"
     environment:
