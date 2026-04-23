@@ -1,11 +1,12 @@
-# Job Scraper by Firas
+# Job Scraper by Firas V2 Improved version 23/04/2026
 
 ![CI](https://github.com/firaslamouchi21/Job-Scraper02/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-A no-nonsense job search tool that finds listings across multiple sites and scores them against your CV using AI. Built it because I was tired of checking ten different job boards every morning.
+A no-nonsense job search tool that finds listings across multiple sites and scores them against your CV using AI. Built it as a tool for myself because I was tired of checking ten different job boards every morning.now that i found a job i can focus on improving this tool.for community use. ill be able to release full version in few months.if you wanna help me you can mail me at firaslamou@gmail.com et merci!
 
-Runs entirely in Docker on a Linux VM. No local Python setup, no dependency hell, no "works on my machine".
+
+ IT Runs entirely in Docker on a Linux VM. No local Python setup, no dependency hell, no "works on my machine".
 
 ## What you get
 
