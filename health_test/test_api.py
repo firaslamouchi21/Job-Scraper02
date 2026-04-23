@@ -70,8 +70,8 @@ class TestHealthEndpoints:
     def test_export_csv_empty(self, client):
         r = client.get("/export/csv")
         assert r.status_code == 200
-        content = r.text
-        assert "title" in content.lower() or content == ""
+        content = r.text.strip()
+        assert content == "" or "title" in content.lower()
 
 
 class TestRunLifecycle:
