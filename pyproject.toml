@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "job-scraper02"
-version = "0.2.0"
+version = "0.3.0"
 description = "Multi-provider AI job scraper with Streamlit UI and REST API"
 readme = "README.md"
 license = {text = "MIT"}
@@ -47,7 +47,7 @@ dev = [
 ]
 
 [project.scripts]
-job-scraper = "cli:main"
+job-scraper = "job_scraper.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/firaslamouchi21/Job-Scraper02"
@@ -56,7 +56,7 @@ Issues = "https://github.com/firaslamouchi21/Job-Scraper02/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["*.py"]
+include = ["job_scraper*"]
 
 [tool.black]
 line-length = 100

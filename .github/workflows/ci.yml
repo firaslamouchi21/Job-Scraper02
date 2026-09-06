@@ -14,16 +14,53 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest
+          pip install pytest build
       - name: python-compile
         run: |
           python -m compileall -q .
+      - name: unit-tests
+        run: |
+          python -m pytest health_test/ -v --tb=short
       - name: cli-smoke
         run: |
-          python cli.py export --format json --limit 1
+          python -m job_scraper.cli export --format json --limit 1
+      - name: package-build
+        run: |
+          python -m build --wheel
+      - name: package-namespace-check
+        run: |
+          python - <<'PY'
+          import glob
+          import sys
+          import zipfile
+
+          wheel = sorted(glob.glob("dist/*.whl"))[-1]
+          names = zipfile.ZipFile(wheel).namelist()
+          top_level_py = {n for n in names if n.endswith(".py") and "/" not in n}
+          disallowed = {
+              "db.py",
+              "scraper.py",
+              "cli.py",
+              "ai_service.py",
+              "notifications.py",
+          }
+          leaked = top_level_py & disallowed
+          if leaked:
+              print(f"flat top-level modules leaked into {wheel}: {leaked}")
+              sys.exit(1)
+          if not any(n.startswith("job_scraper/") for n in names):
+              print(f"job_scraper package missing from {wheel}")
+              sys.exit(1)
+          print(f"OK: {wheel} only exposes job_scraper/*")
+          PY
+      - name: console-script-check
+        run: |
+          pip install --no-deps -e .
+          job-scraper export --format json --limit 1
       - name: docker-build
         run: |
           docker compose build
+          docker build -t job-scraper-combined -f Dockerfile .
       - name: scraper-health
         shell: bash
         run: |
@@ -36,9 +73,81 @@ jobs:
           done
           docker compose logs scraper || true
           exit 1
-      - name: pytest-health-tests
+      - name: scraper-live-run
+        shell: bash
         run: |
-          python -m pytest health_test/ -v --tb=short
+          MOCK_SEARCH=true docker compose up -d scraper
+          up=1
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              up=0
+              break
+            fi
+            sleep 2
+          done
+          if [ "$up" -ne 0 ]; then
+            docker compose logs scraper || true
+            exit 1
+          fi
+          curl -fsS -X POST http://localhost:8000/run \
+            -H "Content-Type: application/json" \
+            -d '{"provider":"groq","lite_mode":true,"sites":["example.com"],"keywords":["python developer"],"cv_text":""}'
+          status=""
+          for i in {1..30}; do
+            status=$(curl -fsS http://localhost:8000/status)
+            if echo "$status" | grep -q '"message":"complete"'; then
+              break
+            fi
+            sleep 1
+          done
+          echo "final status: $status"
+          if ! echo "$status" | grep -q '"message":"complete"'; then
+            docker compose logs scraper || true
+            exit 1
+          fi
+          if ! echo "$status" | grep -q '"added":1'; then
+            echo "expected added:1, got: $status"
+            docker compose logs scraper || true
+            exit 1
+          fi
+          jobs=$(curl -fsS "http://localhost:8000/jobs?limit=10")
+          echo "jobs: $jobs"
+          if ! echo "$jobs" | grep -q '"score":1'; then
+            echo "expected a job scored 1, got: $jobs"
+            exit 1
+          fi
+      - name: ui-health
+        shell: bash
+        run: |
+          docker compose up -d agent-ui
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8501/_stcore/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs agent-ui || true
+          exit 1
+      - name: combined-dockerfile-health
+        shell: bash
+        run: |
+          docker rm -f combined >/dev/null 2>&1 || true
+          docker run -d --name combined \
+            -e MOCK_SEARCH=true \
+            -p 18000:8000 -p 18501:8501 \
+            job-scraper-combined
+          ok=1
+          for i in {1..40}; do
+            if curl -fsS http://localhost:18000/health >/dev/null 2>&1 \
+              && curl -fsS http://localhost:18501/_stcore/health >/dev/null 2>&1; then
+              ok=0
+              break
+            fi
+            sleep 2
+          done
+          docker logs combined || true
+          docker rm -f combined || true
+          exit $ok
       - name: docker-down
         if: always()
         run: |

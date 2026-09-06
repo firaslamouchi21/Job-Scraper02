@@ -5,7 +5,7 @@
     "dockerfilePath": "Dockerfile.ui"
   },
   "deploy": {
-    "startCommand": "python -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0",
+    "startCommand": "python -m streamlit run job_scraper/app.py --server.port $PORT --server.address 0.0.0.0",
     "healthcheckPath": "/_stcore/health",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5

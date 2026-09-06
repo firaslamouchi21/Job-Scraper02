@@ -13,7 +13,7 @@ __pycache__/
 *.sqlite-journal
 *.log
 *.lock
-data/
+data/*
 !data/.gitkeep
 dist/
 build/
@@ -33,3 +33,9 @@ config/*.txt
 !config/sites.txt.example
 !config/keywords.txt.example
 !config/cv.txt.example
+.claude/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

@@ -14,8 +14,8 @@ from duckduckgo_search import DDGS
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-import db
-from ai_service import AIService
+from . import db
+from .ai_service import AIService
 
 USE_PLAYWRIGHT = os.environ.get("USE_PLAYWRIGHT", "true").lower() == "true"
 REQUEST_DELAY_SECONDS = float(os.environ.get("REQUEST_DELAY_SECONDS", "2.0"))
@@ -156,10 +156,19 @@ def request_stop():
     _stop_requested = True
 
 
-def lock():
+_run_lock = threading.Lock()
+
+
+def try_lock() -> bool:
     os.makedirs(data_dir(), exist_ok=True)
-    with open(lock_path(), "w", encoding="utf-8") as f:
-        f.write(str(time.time()))
+    with _run_lock:
+        try:
+            fd = os.open(lock_path(), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            return False
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(str(time.time()))
+        return True
 
 
 def unlock():
@@ -254,19 +263,28 @@ def with_retry(fn):
         raise last
 
 
-def html_extract(url: str):
+def html_extract(url: str, browser=None):
     if USE_PLAYWRIGHT:
         try:
             content = ""
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+            if browser is not None:
+                page = browser.new_page()
                 try:
-                    page = browser.new_page()
                     page.set_default_timeout(25000)
                     page.goto(url, wait_until="domcontentloaded")
                     content = page.content()
                 finally:
-                    browser.close()
+                    page.close()
+            else:
+                with sync_playwright() as p:
+                    own_browser = p.chromium.launch(headless=True)
+                    try:
+                        page = own_browser.new_page()
+                        page.set_default_timeout(25000)
+                        page.goto(url, wait_until="domcontentloaded")
+                        content = page.content()
+                    finally:
+                        own_browser.close()
             soup = BeautifulSoup(content, "html.parser")
             text = soup.get_text(" ", strip=True)
             if text:
@@ -300,15 +318,15 @@ def run_scrape(
     sites: list[str] | None = None,
     keywords: list[str] | None = None,
     cv_text: str | None = None,
+    _lock_acquired: bool = False,
 ):
     global _pause_requested, _stop_requested
-    _pause_requested = False
-    _stop_requested = False
-    
-    if is_running():
+
+    if not _lock_acquired and not try_lock():
         log_event("run_rejected", reason="already_running")
         return
-    lock()
+    _pause_requested = False
+    _stop_requested = False
     try:
         db.init()
         if sites is None:
@@ -351,26 +369,26 @@ def run_scrape(
         done = 0
         added = 0
         write_status("starting", 0, {"running": True, "added": 0, "paused": False})
-        
-        for site in sites or [""]:
-            site_norm = normalize_site(site)
-            if stop_requested():
-                log_event("run_stopped")
-                break
-            while pause_requested():
-                write_status(
-                    "paused",
-                    int((done / total) * 100),
-                    {"running": True, "added": added, "paused": True},
-                )
-                time.sleep(1)
-                if stop_requested():
-                    log_event("run_stopped")
-                    break
-            if stop_requested():
-                break
-                
-            for kw in keywords or [""]:
+
+        pw_ctx = None
+        shared_browser = None
+        if use_ai and USE_PLAYWRIGHT:
+            try:
+                pw_ctx = sync_playwright().start()
+                shared_browser = pw_ctx.chromium.launch(headless=True)
+            except Exception:
+                log_event("browser_launch_failed")
+                if pw_ctx:
+                    try:
+                        pw_ctx.stop()
+                    except Exception:
+                        pass
+                pw_ctx = None
+                shared_browser = None
+
+        try:
+            for site in sites or [""]:
+                site_norm = normalize_site(site)
                 if stop_requested():
                     log_event("run_stopped")
                     break
@@ -386,49 +404,78 @@ def run_scrape(
                         break
                 if stop_requested():
                     break
-                    
-                query_site = f"site:{site_norm}" if site_norm else ""
-                query = " ".join([x for x in [query_site, kw] if x])
-                append_log(f"query={query}")
-                log_event("query", query=query)
-                try:
-                    def search():
-                        sleep_delay()
-                        return ddg_text(query, max_results=10)
 
-                    results = with_retry(search)
-                except Exception:
-                    log_event("search_failed", query=query)
-                    results = []
-                for r in results:
-                    title = r.get("title") or ""
-                    link = r.get("href") or ""
-                    snippet = r.get("body") or ""
-                    company = site_norm or site
-                    text = snippet
-                    if use_ai and link:
-                        fetched = html_extract(link)
-                        if fetched:
-                            text = fetched
-                    score, reasoning = ai.analyze(text, cv_text, keywords)
-                    h = db.upsert_job(
-                        title=title,
-                        company=company,
-                        link=link,
-                        site=site_norm or site,
-                        snippet=snippet,
-                        score=score,
-                        reasoning=reasoning,
+                for kw in keywords or [""]:
+                    if stop_requested():
+                        log_event("run_stopped")
+                        break
+                    while pause_requested():
+                        write_status(
+                            "paused",
+                            int((done / total) * 100),
+                            {"running": True, "added": added, "paused": True},
+                        )
+                        time.sleep(1)
+                        if stop_requested():
+                            log_event("run_stopped")
+                            break
+                    if stop_requested():
+                        break
+
+                    query_site = f"site:{site_norm}" if site_norm else ""
+                    query = " ".join([x for x in [query_site, kw] if x])
+                    append_log(f"query={query}")
+                    log_event("query", query=query)
+                    try:
+                        def search():
+                            sleep_delay()
+                            return ddg_text(query, max_results=10)
+
+                        results = with_retry(search)
+                    except Exception:
+                        log_event("search_failed", query=query)
+                        results = []
+                    for r in results:
+                        title = r.get("title") or ""
+                        link = r.get("href") or ""
+                        snippet = r.get("body") or ""
+                        company = site_norm or site
+                        text = snippet
+                        if use_ai and link:
+                            fetched = html_extract(link, browser=shared_browser)
+                            if fetched:
+                                text = fetched
+                        score, reasoning = ai.analyze(text, cv_text, keywords)
+                        h = db.upsert_job(
+                            title=title,
+                            company=company,
+                            link=link,
+                            site=site_norm or site,
+                            snippet=snippet,
+                            score=score,
+                            reasoning=reasoning,
+                        )
+                        if h:
+                            added += 1
+                    done += 1
+                    pct = int((done / total) * 100)
+                    write_status(
+                        "running",
+                        pct,
+                        {"running": True, "added": added, "paused": False},
                     )
-                    if h:
-                        added += 1
-                done += 1
-                pct = int((done / total) * 100)
-                write_status(
-                    "running",
-                    pct,
-                    {"running": True, "added": added, "paused": False},
-                )
+        finally:
+            if shared_browser:
+                try:
+                    shared_browser.close()
+                except Exception:
+                    pass
+            if pw_ctx:
+                try:
+                    pw_ctx.stop()
+                except Exception:
+                    pass
+
         if stop_requested():
             write_status(
                 "stopped",
@@ -444,7 +491,7 @@ def run_scrape(
             )
             log_event("run_complete", added=added)
             try:
-                from notifications import check_and_notify
+                from .notifications import check_and_notify
 
                 n = check_and_notify()
                 if n > 0:
@@ -506,6 +553,8 @@ def export_csv(limit: int = 200):
 
 @api.post("/run")
 def run(req: RunRequest):
+    if not try_lock():
+        return {"started": False, "running": True}
     keys = {
         "groq": (req.groq_api_key or "").strip(),
         "anthropic": (req.anthropic_api_key or "").strip(),
@@ -522,6 +571,7 @@ def run(req: RunRequest):
             req.keywords,
             req.cv_text,
         ),
+        kwargs={"_lock_acquired": True},
         daemon=True,
     )
     t.start()

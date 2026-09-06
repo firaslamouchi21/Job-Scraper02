@@ -2,7 +2,7 @@ import os
 import time
 import requests
 import streamlit as st
-import db
+from job_scraper import db
 
 DATA_DIR = os.environ.get("DATA_DIR", "./data")
 SCRAPER_URL = os.environ.get("SCRAPER_URL", "http://localhost:8000")
@@ -59,7 +59,11 @@ def control(action: str):
 
 
 def main():
-    st.set_page_config(page_title="Job Scraper Tool by Firas Lamouchi", layout="wide")
+    st.set_page_config(
+        page_title="Job Scraper Tool by Firas Lamouchi",
+        page_icon="🧭",
+        layout="wide",
+    )
     db.init()
 
     st.title("Job Scraper Tool by Firas Lamouchi")
@@ -104,13 +108,16 @@ def main():
         st.session_state.cv_text = cv_text
         sites = parse_lines(sites_raw)
         keywords = parse_lines(keywords_raw)
+        effective_lite = lite_mode or not bool(selected_key)
+        mode_label = "Lite (keyword matching)" if effective_lite else f"AI ({provider})"
+        st.caption(f"Mode: {mode_label}")
         if st.button("Start"):
             ok, err = trigger(
                 provider=provider,
                 groq_api_key=groq_api_key,
                 anthropic_api_key=anthropic_api_key,
                 gemini_api_key=gemini_api_key,
-                lite_mode=lite_mode or (not bool(selected_key)),
+                lite_mode=effective_lite,
                 sites=sites,
                 keywords=keywords,
                 cv_text=cv_text,
@@ -148,7 +155,7 @@ def main():
                 groq_api_key=groq_api_key,
                 anthropic_api_key=anthropic_api_key,
                 gemini_api_key=gemini_api_key,
-                lite_mode=lite_mode or (not bool(selected_key)),
+                lite_mode=effective_lite,
                 sites=sites,
                 keywords=keywords,
                 cv_text=cv_text,
@@ -171,15 +178,29 @@ def main():
 
     with col2:
         jobs = db.list_jobs(limit=200)
-        st.metric("Jobs", len(jobs))
+        total_jobs = db.count_jobs()
+        st.metric("Jobs", total_jobs)
+        if len(jobs) < total_jobs:
+            st.caption(f"Showing top {len(jobs)} of {total_jobs}")
+        if not jobs:
+            st.info("No jobs yet. Add keywords in the sidebar and hit Start.")
         for j in jobs:
             with st.container(border=True):
-                st.subheader(j.get("title") or "")
+                score_val = int(j.get("score") or 0)
+                tier = "green" if score_val >= 7 else "orange" if score_val >= 4 else "gray"
+                top = st.columns([4, 1])
+                with top[0]:
+                    st.subheader(j.get("title") or "")
+                with top[1]:
+                    st.markdown(f":{tier}[**{score_val}/10**]")
                 st.caption(j.get("link") or "")
                 st.write(j.get("snippet") or "")
-                st.write({"score": j.get("score"), "reasoning": j.get("reasoning")})
+                if j.get("reasoning"):
+                    st.caption(j.get("reasoning"))
 
-    time.sleep(0.1)
+    if bool(status.get("running", False)):
+        time.sleep(1.5)
+        st.rerun()
 
 
 if __name__ == "__main__":

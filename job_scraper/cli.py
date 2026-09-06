@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import sys
-import db
+from . import db
 
 
 def parse_args(argv: list[str]):
@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None):
     os.environ["DATA_DIR"] = args.data
 
     if args.cmd == "run":
-        import scraper
+        from . import scraper
 
         keys = {
             "groq": args.groq_api_key or args.api_key or "",
