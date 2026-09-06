@@ -10,22 +10,24 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_USER = os.environ.get("EMAIL_USER", "")
 EMAIL_PASS = os.environ.get("EMAIL_PASS", "")
 EMAIL_TO = os.environ.get("EMAIL_TO", "")
-MIN_SCORE_NOTIFY = int(os.environ.get("MIN_SCORE_NOTIFY", "70"))
+MIN_SCORE_NOTIFY = int(os.environ.get("MIN_SCORE_NOTIFY", "7"))
 
-_last_check_file = os.path.join(os.environ.get("DATA_DIR", "./data"), "last_check.txt")
+def last_check_path():
+    return os.path.join(os.environ.get("DATA_DIR", "./data"), "last_check.txt")
 
 
 def get_last_check():
     try:
-        with open(_last_check_file, "r", encoding="utf-8") as f:
+        with open(last_check_path(), "r", encoding="utf-8") as f:
             return f.read().strip()
     except Exception:
         return "1970-01-01T00:00:00"
 
 
 def set_last_check(ts: str):
-    os.makedirs(os.path.dirname(_last_check_file) or ".", exist_ok=True)
-    with open(_last_check_file, "w", encoding="utf-8") as f:
+    path = last_check_path()
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         f.write(ts)
 
 
@@ -73,7 +75,7 @@ def send_email(jobs: list):
 
 
 def check_and_notify():
-    import db
+    from . import db
 
     last = get_last_check()
     jobs = db.get_jobs_since(last)

@@ -29,6 +29,9 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MOCK_SEARCH=${MOCK_SEARCH:-}
+      - USE_PLAYWRIGHT=${USE_PLAYWRIGHT:-true}
+      - REQUEST_DELAY_SECONDS=${REQUEST_DELAY_SECONDS:-2.0}
     volumes:
       - ./data:/data
 

@@ -14,8 +14,10 @@ def db_path() -> str:
 
 def connect():
     os.makedirs(data_dir(), exist_ok=True)
-    conn = sqlite3.connect(db_path(), check_same_thread=False)
+    conn = sqlite3.connect(db_path(), check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
@@ -70,11 +72,24 @@ def upsert_job(title, company, link, site, snippet, score, reasoning):
 def list_jobs(limit=200):
     conn = connect()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?", (int(limit),))
+    cur.execute(
+        "SELECT * FROM jobs ORDER BY score DESC, created_at DESC LIMIT ?",
+        (int(limit),),
+    )
     rows = cur.fetchall()
     cur.close()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def count_jobs() -> int:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS n FROM jobs")
+    n = cur.fetchone()["n"]
+    cur.close()
+    conn.close()
+    return int(n)
 
 
 def get_jobs_since(timestamp: str):

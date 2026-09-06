@@ -112,7 +112,7 @@ class AIService:
             w = (kw or "").strip().lower()
             if not w:
                 continue
-            if re.search(r"\\b" + re.escape(w) + r"\\b", t):
+            if re.search(r"\b" + re.escape(w) + r"\b", t):
                 hits += 1
         score = min(10, max(0, hits))
         return score, f"matched_keywords={hits}"

@@ -4,13 +4,11 @@ import time
 os.environ["MOCK_SEARCH"] = "true"
 os.environ["USE_PLAYWRIGHT"] = "false"
 os.environ["REQUEST_DELAY_SECONDS"] = "0"
-os.environ["DATA_DIR"] = "./data_test"
 
 import pytest
 from fastapi.testclient import TestClient
 
-import db
-import scraper
+from job_scraper import db, scraper
 
 
 def wait_for_status(client: TestClient, target_msg: str, timeout: float = 10.0):
@@ -22,17 +20,6 @@ def wait_for_status(client: TestClient, target_msg: str, timeout: float = 10.0):
             return data
         time.sleep(0.1)
     return None
-
-
-@pytest.fixture(autouse=True)
-def clean_test_data():
-    import shutil
-    test_dir = "./data_test"
-    if os.path.isdir(test_dir):
-        shutil.rmtree(test_dir, ignore_errors=True)
-    yield
-    if os.path.isdir(test_dir):
-        shutil.rmtree(test_dir, ignore_errors=True)
 
 
 @pytest.fixture
@@ -161,6 +148,25 @@ class TestRunControls:
 class TestConcurrency:
 
     def test_cannot_start_second_run_while_running(self, client):
+        assert scraper.try_lock() is True
+        try:
+            payload = {
+                "provider": "groq",
+                "api_key": "",
+                "lite_mode": True,
+                "sites": ["example.com"],
+                "keywords": ["slow"],
+                "cv_text": "",
+            }
+            r = client.post("/run", json=payload)
+            assert r.status_code == 200
+            data = r.json()
+            assert data.get("started") is False
+            assert data.get("running") is True
+        finally:
+            scraper.unlock()
+
+    def test_second_run_rejected_end_to_end(self, client):
         payload = {
             "provider": "groq",
             "api_key": "",
@@ -170,14 +176,12 @@ class TestConcurrency:
             "cv_text": "",
         }
         r1 = client.post("/run", json=payload)
-        assert r1.status_code == 200
-        assert r1.json().get("started") is True
-
-        time.sleep(0.2)
-
         r2 = client.post("/run", json=payload)
-        assert r2.status_code == 200
-        assert r2.json().get("started") is True
+        assert r1.status_code == 200 and r2.status_code == 200
+        started_flags = [r1.json().get("started"), r2.json().get("started")]
+        assert started_flags.count(True) == 1
+        assert started_flags.count(False) == 1
+        wait_for_status(client, "complete")
 
 
 class TestExport:
